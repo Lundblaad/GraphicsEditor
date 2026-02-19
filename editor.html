@@ -1,0 +1,1268 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Graphics Layout Editor (Localhost)</title>
+
+  <!-- Google Font: Oswald -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+
+  <style>
+    :root {
+      --ui-bg: #0f1115;
+      --ui-panel: #151924;
+      --ui-border: #2a3246;
+      --ui-text: #e8eefc;
+      --ui-muted: #a9b3cc;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: var(--ui-bg); color: var(--ui-text); }
+
+    .app {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 12px;
+      height: 100%;
+      padding: 12px;
+    }
+
+    .stage-wrap {
+      position: relative;
+      border: 1px solid var(--ui-border);
+      background: #0b0d12;
+      border-radius: 10px;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .mode-badge {
+      position: absolute;
+      right: 14px;
+      top: 54px;
+      z-index: 20;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.45);
+      color: #c9d2e6;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .mode-badge.text-mode {
+      border-color: rgba(106,169,255,0.8);
+      color: #d6e8ff;
+      background: rgba(25,72,140,0.42);
+    }
+
+    .stage-toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid var(--ui-border);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .btn {
+      background: rgba(255,255,255,0.06);
+      color: var(--ui-text);
+      border: 1px solid var(--ui-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .btn:hover { border-color: rgba(255,255,255,0.25); }
+    .btn.primary { border-color: rgba(106,169,255,0.6); }
+    .btn.danger { border-color: rgba(255,106,106,0.5); }
+
+    .stage-viewport { overflow: auto; padding: 12px; }
+
+    .stage {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      background: #111522;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 0px; /* sharp */
+      transform-origin: top left;
+    }
+
+    .guides {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.35;
+      border-radius: 0px; /* sharp */
+    }
+
+    .element {
+      position: absolute;
+      border: 1px solid rgba(255,255,255,0.18);
+      outline: none;
+      user-select: none;
+      border-radius: 0px; /* sharp boxes */
+      overflow: hidden;
+    }
+
+    .element.selected {
+      border-color: rgba(106,169,255,0.9);
+      box-shadow: 0 0 0 2px rgba(106,169,255,0.25);
+    }
+
+    .element .bg { position: absolute; inset: 0; }
+
+    /* SVG overlay */
+    .element svg.fg {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    /* Foreground handle (drag+resize) - sized to the text bbox */
+    .fg-handle {
+      position: absolute;
+      border: 1px dashed rgba(255,255,255,0.0);
+      background: rgba(0,0,0,0.0);
+      cursor: move;
+      box-sizing: border-box;
+    }
+
+    .element.selected .fg-handle {
+      border-color: rgba(255,255,255,0.30);
+      background: rgba(0,0,0,0.02);
+    }
+
+    .logo-box {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      border: 1px dashed rgba(255,255,255,0.35);
+      border-radius: 0px; /* sharp */
+      color: rgba(255,255,255,0.7);
+      font-size: 11px;
+      pointer-events: none;
+      background: rgba(0,0,0,0.12);
+    }
+
+    .panel {
+      border: 1px solid var(--ui-border);
+      background: var(--ui-panel);
+      border-radius: 10px;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-width: 0;
+    }
+
+    .panel header {
+      padding: 12px;
+      border-bottom: 1px solid var(--ui-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .panel header .title { font-weight: 800; letter-spacing: 0.2px; }
+    .panel header .sub { color: var(--ui-muted); font-size: 12px; }
+
+    .panel .content { padding: 12px; overflow: auto; }
+
+    .group {
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .group h3 {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      color: var(--ui-text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    label { display: grid; gap: 4px; font-size: 12px; color: var(--ui-muted); }
+
+    input, select, textarea {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.25);
+      color: var(--ui-text);
+      padding: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 84px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .panel footer {
+      padding: 12px;
+      border-top: 1px solid var(--ui-border);
+      display: grid;
+      gap: 8px;
+    }
+
+    .muted { color: var(--ui-muted); font-size: 12px; }
+    .kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      padding: 1px 6px;
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 6px;
+      background: rgba(0,0,0,0.25);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="stage-wrap">
+      <div class="stage-toolbar">
+        <button class="btn primary" id="btnExport">Export JSON</button>
+        <button class="btn" id="btnCopy">Copy JSON</button>
+        <button class="btn" id="btnImport">Import JSON</button>
+        <button class="btn" id="btnToggleGrid">Toggle grid</button>
+        <button class="btn danger" id="btnDelete">Delete selected</button>
+        <span class="muted" style="margin-left:auto">
+          Drag/resize boxes: mouse. Hold <span class="kbd">Ctrl</span> to drag/resize text.
+        </span>
+      </div>
+      <div class="mode-badge" id="modeBadge">BOX MODE</div>
+
+      <div class="stage-viewport" id="viewport">
+        <div class="stage" id="stage">
+          <div class="guides" id="grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <header>
+        <div>
+          <div class="title">Inspector</div>
+          <div class="sub" id="selSummary">No selection</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center">
+          <label style="grid-auto-flow: column; align-items:center; gap:8px; margin:0;">
+            <span style="color:var(--ui-muted); font-size:12px;">Primary</span>
+            <input type="color" id="primaryColor" style="width:56px; padding:0; height:32px;" />
+          </label>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="group">
+          <h3>Box</h3>
+          <div class="row">
+            <label>X <input type="number" id="boxX" /></label>
+            <label>Y <input type="number" id="boxY" /></label>
+          </div>
+          <div class="row">
+            <label>Width <input type="number" id="boxW" /></label>
+            <label>Height <input type="number" id="boxH" /></label>
+          </div>
+          <div class="row">
+            <label>Z <input type="number" id="boxZ" /></label>
+            <label>Type <input type="text" id="boxType" disabled /></label>
+          </div>
+        </div>
+
+        <div class="group">
+          <h3>Background</h3>
+          <div class="row">
+            <label>Color <input type="text" id="bgColor" placeholder="#ffffff or $primary" /></label>
+            <label>Color picker <input type="color" id="bgColorPicker" /></label>
+          </div>
+          <div class="row">
+            <label>Opacity <input type="number" id="bgOpacity" min="0" max="1" step="0.05" /></label>
+            <label>(RGB/HEX) <input type="text" disabled value="Use text field or picker" /></label>
+          </div>
+          <div class="row">
+            <label>Gradient
+              <select id="bgGradient">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+            <label>Hide empty
+              <select id="bgHideEmpty">
+                <option value="(unset)">(unset)</option>
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="group">
+          <h3>Foreground</h3>
+          <div class="row">
+            <label>Text <input type="text" id="fgText" /></label>
+            <label>Color <input type="text" id="fgColor" placeholder="#000000" /></label>
+          </div>
+
+          <div class="row">
+            <label>Color picker <input type="color" id="fgColorPicker" /></label>
+            <label>Font size <input type="number" id="fgFontSize" step="0.1" /></label>
+          </div>
+
+          <div class="row">
+            <label>Weight
+              <select id="fgWeight">
+                <option value="normal">normal</option>
+                <option value="bold">bold</option>
+                <option value="bolder">bolder</option>
+                <option value="lighter">lighter</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row">
+            <label>Font family (global)
+              <select id="fgFontFamily">
+                <option value="system-ui">System UI</option>
+                <option value="Arial">Arial</option>
+                <option value="Oswald">Oswald</option>
+              </select>
+            </label>
+            <label style="opacity:0.85">(Oswald loaded)</label>
+          </div>
+
+          <div class="row">
+            <label>Text align
+              <select id="fgAlign">
+                <option value="LEFT">LEFT</option>
+                <option value="CENTER">CENTER</option>
+                <option value="RIGHT">RIGHT</option>
+              </select>
+            </label>
+            <label>Opacity <input type="number" id="fgOpacity" min="0" max="1" step="0.05" /></label>
+          </div>
+
+          <div class="row">
+            <label>FG X <input type="number" id="fgX" step="0.5" /></label>
+            <label>FG Y <input type="number" id="fgY" step="0.5" /></label>
+          </div>
+
+          <div class="row">
+            <label>Max chars <input type="number" id="fgMaxChars" /></label>
+            <label>(display-only) <input type="text" disabled value="Text is clipped to maxChars" /></label>
+          </div>
+        </div>
+
+        <div class="group">
+          <h3>Logo (if present)</h3>
+          <div class="row">
+            <label>Logo type <input type="text" id="logoType" disabled /></label>
+            <label>(dynamic) <input type="text" disabled value="Placeholder box" /></label>
+          </div>
+          <div class="row">
+            <label>Logo X <input type="number" id="logoX" /></label>
+            <label>Logo Y <input type="number" id="logoY" /></label>
+          </div>
+          <div class="row">
+            <label>Logo W <input type="number" id="logoW" /></label>
+            <label>Logo H <input type="number" id="logoH" /></label>
+          </div>
+        </div>
+
+        <div class="group">
+          <h3>JSON</h3>
+          <label>Current JSON (editable)
+            <textarea id="jsonArea"></textarea>
+          </label>
+          <div class="muted">Import overwrites the stage. Export reflects drag/resize edits.</div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="muted">Tip: use <span class="kbd">$primary</span> in background colors; it resolves to primaryColor.</div>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    // ===== Input JSON (your provided string) =====
+    const initial = {"graphics":[{"type":"HOME_TEAM_NAME","width":142,"height":60,"x":753,"y":45,"z":0,"foreground":{"x":850,"y":86,"text":"VHC","color":"#000000","opacity":1,"fontSize":30,"weight":"bold","maxChars":3,"textAlign":"CENTER","logo":{"logoType":"DYNAMIC","height":50,"width":50,"x":758,"y":50}},"background":{"color":"#ffffff","gradient":true,"opacity":1,"hideEmpty":false}},{"type":"HOME_RESULT","width":65,"height":60,"x":895,"y":45,"z":0,"foreground":{"x":927,"y":86,"text":"32","color":"#ffffff","opacity":1,"fontSize":30,"weight":"bold","maxChars":3,"textAlign":"CENTER"},"background":{"color":"$primary","gradient":true,"opacity":1}},{"type":"SITE_LOGO","width":75,"height":75,"x":1810,"y":35,"z":1,"background":{"gradient":false,"image":{"id":"69661b21262e7bd41fce2434","blobId":"10cba07d-22fc-4607-9b4a-c1755bd2cbf2","mimeType":"image/svg+xml"},"opacity":1}},{"type":"PERIOD","width":60,"height":25,"x":930,"y":20,"z":1,"foreground":{"x":960,"y":42,"text":"P1","color":"#ffffff","opacity":1,"fontSize":20,"weight":"bold","maxChars":5,"textAlign":"CENTER"},"background":{"color":"$primary","gradient":true,"opacity":1,"hideEmpty":true}},{"type":"INFO_MESSAGE","width":600,"height":60,"x":40,"y":45,"z":1,"foreground":{"x":55,"y":86,"text":"Info message","color":"#ffffff","opacity":1,"fontSize":30,"weight":"normal","maxChars":40,"textAlign":"LEFT"},"background":{"color":"#000000","gradient":false,"opacity":0.6,"hideEmpty":true}},{"type":"MATCH_EVENT_TEAM_LOGO","width":60,"height":60,"x":40,"y":920,"z":1,"foreground":{"x":58,"y":965,"text":"","color":"#ffffff","opacity":1,"fontSize":24,"weight":"bold","maxChars":0,"textAlign":"LEFT","logo":{"logoType":"DYNAMIC","height":50,"width":50,"x":45,"y":925}},"background":{"color":"$primary","gradient":true,"opacity":1}},{"type":"HOME_TEAM_COLOR","width":20,"height":60,"x":733,"y":45,"z":1,"background":{"color":"#ff0000","gradient":false,"opacity":1,"hideEmpty":true}},{"type":"MATCH_EVENT_TEAM_COLOR","width":20,"height":60,"x":99,"y":920,"z":1,"foreground":{"x":1210,"y":1013,"text":"","color":"#ffffff","opacity":1,"fontSize":24,"weight":"normal","maxChars":1,"textAlign":"LEFT"},"background":{"color":"$primary","gradient":false,"opacity":1}},{"type":"MATCH_EVENT_MAIN_INFO","width":587,"height":60,"x":119,"y":920,"z":1,"foreground":{"x":134,"y":963,"text":"Main info ","color":"#ffffff","opacity":1,"fontSize":30,"weight":"bold","maxChars":40,"textAlign":"LEFT"},"background":{"color":"$primary","gradient":true,"opacity":1}},{"type":"AWAY_RESULT","width":65,"height":60,"x":960,"y":45,"z":1,"foreground":{"x":992,"y":86,"text":"23","color":"#ffffff","opacity":1,"fontSize":30,"weight":"bold","maxChars":5,"textAlign":"CENTER"},"background":{"color":"$primary","gradient":true,"opacity":1}},{"type":"MATCH_EVENT_EXTRA_INFO","width":666,"height":60,"x":40,"y":980,"z":1,"foreground":{"x":55,"y":1020,"text":"Match event extra info","color":"#000000","opacity":1,"fontSize":28,"weight":"normal","maxChars":50,"textAlign":"LEFT"},"background":{"color":"#ffffff","gradient":true,"opacity":1}},{"type":"AWAY_TEAM_COLOR","width":20,"height":60,"x":1167,"y":45,"z":2,"background":{"color":"#00ffff","gradient":false,"opacity":1,"hideEmpty":true}},{"type":"AWAY_TEAM_NAME","width":142,"height":60,"x":1025,"y":45,"z":2,"foreground":{"x":1070,"y":86,"text":"DIF","color":"#000000","opacity":1,"fontSize":30,"weight":"bold","maxChars":3,"textAlign":"CENTER","logo":{"logoType":"DYNAMIC","height":50,"width":50,"x":1112,"y":50}},"background":{"color":"#ffffff","gradient":true,"opacity":1}},{"type":"GAME_CLOCK","width":120,"height":45,"x":900,"y":111,"z":7,"foreground":{"x":960,"y":144,"text":"06:35","color":"#000000","opacity":1,"fontSize":28,"weight":"bold","maxChars":5,"textAlign":"CENTER"},"background":{"color":"#fafafa","gradient":true,"opacity":1,"hideEmpty":true}}],"primaryColor":"#102b2b"};
+
+    // ===== State =====
+    let state = structuredClone(initial);
+    let selectedId = null;
+    const undoStack = [];
+    const HISTORY_LIMIT = 200;
+
+    const stage = document.getElementById("stage");
+    const grid = document.getElementById("grid");
+    const jsonArea = document.getElementById("jsonArea");
+    const modeBadge = document.getElementById("modeBadge");
+
+    // ===== Helpers =====
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    const isNil = (v) => v === null || v === undefined;
+    const asBool = (v) => (v === true || v === "true");
+    const resolveColor = (c) => (c === "$primary" ? state.primaryColor : c);
+    const safeOpacity = (o) => clamp(Number(o ?? 1), 0, 1);
+    const colorCtx = document.createElement("canvas").getContext("2d");
+
+    function colorToHex(value, fallback = "#000000") {
+      const raw = resolveColor(value);
+      if (!raw || !colorCtx) return fallback;
+      colorCtx.fillStyle = "#000000";
+      colorCtx.fillStyle = String(raw);
+      const normalized = String(colorCtx.fillStyle || "").toLowerCase();
+      if (/^#[0-9a-f]{6}$/.test(normalized)) return normalized;
+      if (/^#[0-9a-f]{3}$/.test(normalized)) {
+        const r = normalized[1], g = normalized[2], b = normalized[3];
+        return `#${r}${r}${g}${g}${b}${b}`;
+      }
+      return fallback;
+    }
+
+    function getFirstFontFamily(graphics) {
+      const withFont = (graphics || []).find((g) => g?.foreground?.fontFamily);
+      return withFont?.foreground?.fontFamily || null;
+    }
+
+    function ensureGlobalFontFamily() {
+      if (!state.fontFamily) {
+        state.fontFamily = getFirstFontFamily(state.graphics) || "Oswald";
+      }
+      return state.fontFamily;
+    }
+
+    function applyGlobalFontToAll() {
+      const font = ensureGlobalFontFamily();
+      state.graphics.forEach((g) => {
+        if (!g?.foreground) return;
+        g.foreground.fontFamily = font;
+      });
+    }
+
+    function isEditableTarget(target) {
+      return !!(target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable='true']"));
+    }
+
+    function pushUndoSnapshot() {
+      const snapshot = structuredClone(state);
+      const prev = undoStack[undoStack.length - 1];
+      if (prev && JSON.stringify(prev) === JSON.stringify(snapshot)) return;
+      undoStack.push(snapshot);
+      if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+    }
+
+    function undoLastChange() {
+      if (!undoStack.length) return false;
+      state = structuredClone(undoStack.pop());
+      selectedId = null;
+      render();
+      return true;
+    }
+
+    function updateModeBadge(ctrlActive) {
+      if (!modeBadge) return;
+      if (ctrlActive) {
+        modeBadge.textContent = "TEXT MODE (CTRL)";
+        modeBadge.classList.add("text-mode");
+      } else {
+        modeBadge.textContent = "BOX MODE";
+        modeBadge.classList.remove("text-mode");
+      }
+    }
+
+    function bgStyle(bg) {
+      if (!bg) return { background: "transparent", opacity: 1 };
+      const opacity = safeOpacity(bg.opacity);
+      const color = resolveColor(bg.color ?? "transparent");
+      const gradient = !!bg.gradient;
+
+      if (gradient && color && color !== "transparent") {
+        return { background: `linear-gradient(to bottom, ${color}, rgba(0,0,0,0.15))`, opacity };
+      }
+      return { background: color ?? "transparent", opacity };
+    }
+
+    function applyHideEmpty(g) {
+      const hideEmpty = g.background?.hideEmpty;
+      if (!asBool(hideEmpty)) return false;
+
+      const t = g.foreground?.text;
+      const hasText = !!(t && String(t).trim().length > 0);
+      const hasLogo = !!g.foreground?.logo;
+      const hasBgImage = !!g.background?.image;
+      return !(hasText || hasLogo || hasBgImage);
+    }
+
+    function assignIds() {
+      state.graphics.forEach((g, idx) => {
+        if (!g.__id) g.__id = `${g.type}__${idx}__${Math.random().toString(16).slice(2)}`;
+      });
+    }
+
+    function sortByZ(a, b) {
+      const za = Number(a.z ?? 0), zb = Number(b.z ?? 0);
+      if (za !== zb) return za - zb;
+      return 0;
+    }
+
+    function findById(id) {
+      return state.graphics.find(g => g.__id === id);
+    }
+
+    function select(id) {
+      selectedId = id;
+      render();
+    }
+
+    stage.addEventListener("mousedown", () => {
+      selectedId = null;
+      render();
+    });
+
+    function exportJson() {
+      const out = structuredClone(state);
+      delete out.fontFamily;
+      out.graphics.forEach(g => { delete g.__id; });
+      return out;
+    }
+
+    function syncJsonAreaIfNotFocused() {
+      if (document.activeElement !== jsonArea) {
+        jsonArea.value = JSON.stringify(exportJson(), null, 2);
+      }
+    }
+
+    // ===== Render =====
+    function render() {
+      const globalFont = ensureGlobalFontFamily();
+      assignIds();
+
+      if (document.activeElement !== jsonArea) {
+        jsonArea.value = JSON.stringify(exportJson(), null, 2);
+      }
+
+      [...stage.querySelectorAll(".element")].forEach(el => el.remove());
+      const ordered = [...state.graphics].sort(sortByZ);
+      const svgNS = "http://www.w3.org/2000/svg";
+
+      for (const g of ordered) {
+        const hidden = applyHideEmpty(g);
+
+        const el = document.createElement("div");
+        el.className = "element";
+        el.dataset.id = g.__id;
+        el.style.left = `${Number(g.x ?? 0)}px`;
+        el.style.top = `${Number(g.y ?? 0)}px`;
+        el.style.width = `${Number(g.width ?? 0)}px`;
+        el.style.height = `${Number(g.height ?? 0)}px`;
+        el.style.zIndex = `${Number(g.z ?? 0)}`;
+        el.tabIndex = 0;
+        if (hidden) el.style.display = "none";
+
+        // Background
+        const bg = document.createElement("div");
+        bg.className = "bg";
+        const bgS = bgStyle(g.background);
+        bg.style.background = bgS.background;
+        bg.style.opacity = bgS.opacity;
+
+        if (g.background?.image) {
+          bg.style.background = "rgba(255,255,255,0.08)";
+          bg.style.border = "1px dashed rgba(255,255,255,0.30)";
+          bg.style.display = "grid";
+          bg.style.placeItems = "center";
+          bg.style.color = "rgba(255,255,255,0.75)";
+          bg.style.fontSize = "11px";
+          bg.textContent = "IMAGE";
+        }
+
+        // Foreground handle (will be sized to text bbox after measuring)
+        const fgHandle = document.createElement("div");
+        fgHandle.className = "fg-handle";
+        fgHandle.dataset.id = g.__id;
+        fgHandle.style.left = "0px";
+        fgHandle.style.top = "0px";
+        fgHandle.style.width = "10px";
+        fgHandle.style.height = "10px";
+
+        fgHandle.addEventListener("mousedown", (e) => {
+          e.stopPropagation();
+          select(g.__id);
+        });
+
+        // SVG
+        const f = g.foreground || {};
+        const align = (f.textAlign ?? "LEFT").toUpperCase();
+        const rawText = (isNil(f.text) ? "" : String(f.text));
+        const maxChars = Number(f.maxChars ?? 0);
+        const clipped = (maxChars > 0 ? rawText.slice(0, maxChars) : rawText);
+
+        // Anchor ABS
+        let axAbs = !isNil(f.x) ? Number(f.x) : (Number(g.x ?? 0) + Number(g.width ?? 0) / 2);
+        let ayAbs = !isNil(f.y) ? Number(f.y) : (Number(g.y ?? 0) + Number(g.height ?? 0) / 2);
+
+        const ax = axAbs - Number(g.x ?? 0);
+        const ay = ayAbs - Number(g.y ?? 0);
+
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.classList.add("fg");
+        svg.setAttribute("width", "100%");
+        svg.setAttribute("height", "100%");
+        svg.setAttribute("viewBox", `0 0 ${Number(g.width ?? 0)} ${Number(g.height ?? 0)}`);
+
+        const textEl = document.createElementNS(svgNS, "text");
+        textEl.textContent = clipped;
+
+        const textAnchor =
+          align === "CENTER" ? "middle" :
+          align === "RIGHT"  ? "end" : "start";
+
+        textEl.setAttribute("x", String(ax));
+        textEl.setAttribute("y", String(ay));
+        textEl.setAttribute("text-anchor", textAnchor);
+        textEl.setAttribute("xml:space", "preserve");
+
+        textEl.setAttribute("fill", f.color ?? "#ffffff");
+        textEl.setAttribute("fill-opacity", String(safeOpacity(f.opacity)));
+        textEl.setAttribute("font-size", String(Number(f.fontSize ?? 16)));
+        textEl.setAttribute("font-weight", String(f.weight ?? "normal"));
+        textEl.setAttribute("font-family", String(globalFont || "Oswald"));
+
+        svg.appendChild(textEl);
+        fgHandle.appendChild(svg);
+
+        // Logo placeholder
+        if (f.logo) {
+          const l = f.logo;
+          const lb = document.createElement("div");
+          lb.className = "logo-box";
+          lb.style.left = `${Number(l.x ?? 0) - Number(g.x ?? 0)}px`;
+          lb.style.top = `${Number(l.y ?? 0) - Number(g.y ?? 0)}px`;
+          lb.style.width = `${Number(l.width ?? 0)}px`;
+          lb.style.height = `${Number(l.height ?? 0)}px`;
+          lb.textContent = "LOGO";
+          el.appendChild(lb);
+        }
+
+        el.appendChild(bg);
+        el.appendChild(fgHandle);
+
+        if (selectedId === g.__id) el.classList.add("selected");
+
+        el.addEventListener("mousedown", (e) => {
+          e.stopPropagation();
+          select(g.__id);
+        });
+
+        stage.appendChild(el);
+
+        // --- Measure text bbox and size the fgHandle around it ---
+        if (clipped && clipped.length) {
+          try {
+            const bb2 = textEl.getBBox();
+
+            // Padding around text bbox for easier grabbing/resizing
+            const pad = 6;
+            let left = bb2.x - pad;
+            let top = bb2.y - pad;
+            let width = bb2.width + pad * 2;
+            let height = bb2.height + pad * 2;
+
+            const boxW = Math.max(1, Number(g.width ?? 0));
+            const boxH = Math.max(1, Number(g.height ?? 0));
+            width = clamp(width, 10, boxW);
+            height = clamp(height, 10, boxH);
+            left = clamp(left, 0, Math.max(0, boxW - width));
+            top = clamp(top, 0, Math.max(0, boxH - height));
+
+            fgHandle.style.left = `${left}px`;
+            fgHandle.style.top = `${top}px`;
+            fgHandle.style.width = `${width}px`;
+            fgHandle.style.height = `${height}px`;
+          } catch {
+            // leave tiny handle
+          }
+        } else {
+          // No text: keep handle tiny at anchor point
+          const boxW = Math.max(1, Number(g.width ?? 0));
+          const boxH = Math.max(1, Number(g.height ?? 0));
+          const width = Math.min(12, boxW);
+          const height = Math.min(12, boxH);
+          const left = clamp(ax - 6, 0, Math.max(0, boxW - width));
+          const top = clamp(ay - 6, 0, Math.max(0, boxH - height));
+          fgHandle.style.left = `${left}px`;
+          fgHandle.style.top = `${top}px`;
+          fgHandle.style.width = `${width}px`;
+          fgHandle.style.height = `${height}px`;
+        }
+      }
+
+      wireInteract();
+      refreshInspector();
+    }
+
+    // ===== Interactions =====
+    let nativeWired = false;
+    let dragCtx = null;
+
+    function wireInteract() {
+      if (nativeWired) return;
+      nativeWired = true;
+
+      const edge = 16;
+      const textEdge = 12;
+
+      function parsePx(v) {
+        return Number.parseFloat(v || "0");
+      }
+
+      function hitEdges(rect, x, y, m = edge) {
+        return {
+          left: Math.abs(x - rect.left) <= m,
+          right: Math.abs(x - rect.right) <= m,
+          top: Math.abs(y - rect.top) <= m,
+          bottom: Math.abs(y - rect.bottom) <= m
+        };
+      }
+
+      function hasAnyEdge(e) {
+        return e.left || e.right || e.top || e.bottom;
+      }
+
+      function selectLive(id) {
+        selectedId = id;
+        stage.querySelectorAll(".element").forEach((node) => {
+          node.classList.toggle("selected", node.dataset.id === id);
+        });
+        refreshInspector();
+      }
+
+      function startBoxDrag(el, id, x, y) {
+        const g = findById(id);
+        if (!g) return;
+        pushUndoSnapshot();
+        dragCtx = {
+          kind: "box-drag",
+          id,
+          el,
+          startMouseX: x,
+          startMouseY: y,
+          startX: Number(g.x ?? 0),
+          startY: Number(g.y ?? 0)
+        };
+      }
+
+      function startBoxResize(el, id, x, y, edges) {
+        const g = findById(id);
+        if (!g) return;
+        pushUndoSnapshot();
+        dragCtx = {
+          kind: "box-resize",
+          id,
+          el,
+          edges,
+          startMouseX: x,
+          startMouseY: y,
+          startX: Number(g.x ?? 0),
+          startY: Number(g.y ?? 0),
+          startW: Number(g.width ?? 1),
+          startH: Number(g.height ?? 1)
+        };
+      }
+
+      function startTextDrag(handle, id, x, y) {
+        const g = findById(id);
+        if (!g) return;
+        g.foreground = g.foreground || {};
+        pushUndoSnapshot();
+
+        dragCtx = {
+          kind: "text-drag",
+          id,
+          handle,
+          startMouseX: x,
+          startMouseY: y,
+          startLeft: parsePx(handle.style.left),
+          startTop: parsePx(handle.style.top),
+          startFx: Number(g.foreground.x ?? (Number(g.x ?? 0) + Number(g.width ?? 0) / 2)),
+          startFy: Number(g.foreground.y ?? (Number(g.y ?? 0) + Number(g.height ?? 0) / 2))
+        };
+      }
+
+      function startTextResize(handle, id, x, y, edges) {
+        const g = findById(id);
+        if (!g) return;
+        g.foreground = g.foreground || {};
+        pushUndoSnapshot();
+
+        dragCtx = {
+          kind: "text-resize",
+          id,
+          handle,
+          edges,
+          startMouseX: x,
+          startMouseY: y,
+          startLeft: parsePx(handle.style.left),
+          startTop: parsePx(handle.style.top),
+          startW: Math.max(1, parsePx(handle.style.width)),
+          startH: Math.max(1, parsePx(handle.style.height)),
+          startFont: Number(g.foreground.fontSize ?? 16)
+        };
+      }
+
+      stage.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        updateModeBadge(!!e.ctrlKey);
+
+        const handle = e.target.closest(".fg-handle");
+        if (handle && e.ctrlKey) {
+          const id = handle.dataset.id;
+          if (!id) return;
+          selectLive(id);
+          const edges = hitEdges(handle.getBoundingClientRect(), e.clientX, e.clientY, textEdge);
+          if (hasAnyEdge(edges)) startTextResize(handle, id, e.clientX, e.clientY, edges);
+          else startTextDrag(handle, id, e.clientX, e.clientY);
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+
+        const el = e.target.closest(".element");
+        if (!el) return;
+        const id = el.dataset.id;
+        if (!id) return;
+        selectLive(id);
+        if (e.ctrlKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+
+        const edges = hitEdges(el.getBoundingClientRect(), e.clientX, e.clientY, edge);
+        if (hasAnyEdge(edges)) startBoxResize(el, id, e.clientX, e.clientY, edges);
+        else startBoxDrag(el, id, e.clientX, e.clientY);
+
+        e.preventDefault();
+        e.stopPropagation();
+      }, true);
+
+      document.addEventListener("mousemove", (e) => {
+        if (!dragCtx) return;
+        const g = findById(dragCtx.id);
+        if (!g) return;
+
+        const dx = e.clientX - dragCtx.startMouseX;
+        const dy = e.clientY - dragCtx.startMouseY;
+
+        if (dragCtx.kind === "box-drag") {
+          g.x = Math.round(dragCtx.startX + dx);
+          g.y = Math.round(dragCtx.startY + dy);
+          dragCtx.el.style.left = `${g.x}px`;
+          dragCtx.el.style.top = `${g.y}px`;
+          refreshInspectorBoxOnly();
+        } else if (dragCtx.kind === "box-resize") {
+          let x = dragCtx.startX;
+          let y = dragCtx.startY;
+          let w = dragCtx.startW;
+          let h = dragCtx.startH;
+
+          if (dragCtx.edges.left) { x = dragCtx.startX + dx; w = dragCtx.startW - dx; }
+          if (dragCtx.edges.right) { w = dragCtx.startW + dx; }
+          if (dragCtx.edges.top) { y = dragCtx.startY + dy; h = dragCtx.startH - dy; }
+          if (dragCtx.edges.bottom) { h = dragCtx.startH + dy; }
+
+          if (w < 10) { if (dragCtx.edges.left) x -= (10 - w); w = 10; }
+          if (h < 10) { if (dragCtx.edges.top) y -= (10 - h); h = 10; }
+
+          g.x = Math.round(x);
+          g.y = Math.round(y);
+          g.width = Math.round(w);
+          g.height = Math.round(h);
+
+          dragCtx.el.style.left = `${g.x}px`;
+          dragCtx.el.style.top = `${g.y}px`;
+          dragCtx.el.style.width = `${g.width}px`;
+          dragCtx.el.style.height = `${g.height}px`;
+          refreshInspectorBoxOnly();
+        } else if (dragCtx.kind === "text-drag") {
+          g.foreground = g.foreground || {};
+          const boxW = Math.max(1, Number(g.width ?? 0));
+          const boxH = Math.max(1, Number(g.height ?? 0));
+          const handleW = Math.max(1, parsePx(dragCtx.handle.style.width));
+          const handleH = Math.max(1, parsePx(dragCtx.handle.style.height));
+
+          const nextLeft = clamp(dragCtx.startLeft + dx, 0, Math.max(0, boxW - handleW));
+          const nextTop = clamp(dragCtx.startTop + dy, 0, Math.max(0, boxH - handleH));
+          const appliedDx = nextLeft - dragCtx.startLeft;
+          const appliedDy = nextTop - dragCtx.startTop;
+
+          g.foreground.x = dragCtx.startFx + appliedDx;
+          g.foreground.y = dragCtx.startFy + appliedDy;
+          dragCtx.handle.style.left = `${nextLeft}px`;
+          dragCtx.handle.style.top = `${nextTop}px`;
+          refreshInspector();
+        } else if (dragCtx.kind === "text-resize") {
+          let left = dragCtx.startLeft;
+          let top = dragCtx.startTop;
+          let w = dragCtx.startW;
+          let h = dragCtx.startH;
+
+          if (dragCtx.edges.left) { left = dragCtx.startLeft + dx; w = dragCtx.startW - dx; }
+          if (dragCtx.edges.right) { w = dragCtx.startW + dx; }
+          if (dragCtx.edges.top) { top = dragCtx.startTop + dy; h = dragCtx.startH - dy; }
+          if (dragCtx.edges.bottom) { h = dragCtx.startH + dy; }
+
+          if (w < 10) { if (dragCtx.edges.left) left -= (10 - w); w = 10; }
+          if (h < 10) { if (dragCtx.edges.top) top -= (10 - h); h = 10; }
+
+          const boxW = Math.max(1, Number(g.width ?? 0));
+          const boxH = Math.max(1, Number(g.height ?? 0));
+          w = Math.min(w, boxW);
+          h = Math.min(h, boxH);
+          left = clamp(left, 0, Math.max(0, boxW - w));
+          top = clamp(top, 0, Math.max(0, boxH - h));
+
+          dragCtx.handle.style.left = `${left}px`;
+          dragCtx.handle.style.top = `${top}px`;
+          dragCtx.handle.style.width = `${w}px`;
+          dragCtx.handle.style.height = `${h}px`;
+
+          const scale = h / dragCtx.startH;
+          g.foreground = g.foreground || {};
+          g.foreground.fontSize = clamp(dragCtx.startFont * scale, 6, 200);
+
+          const textNode = dragCtx.handle.querySelector("text");
+          if (textNode) textNode.setAttribute("font-size", String(g.foreground.fontSize));
+          refreshInspector();
+        }
+
+        syncJsonAreaIfNotFocused();
+        e.preventDefault();
+      });
+
+      document.addEventListener("mouseup", () => {
+        if (!dragCtx) return;
+        dragCtx = null;
+        render();
+      });
+    }
+
+    // ===== Inspector wiring =====
+    const selSummary = document.getElementById("selSummary");
+    const primaryColor = document.getElementById("primaryColor");
+
+    const boxX = document.getElementById("boxX");
+    const boxY = document.getElementById("boxY");
+    const boxW = document.getElementById("boxW");
+    const boxH = document.getElementById("boxH");
+    const boxZ = document.getElementById("boxZ");
+    const boxType = document.getElementById("boxType");
+
+    const bgColor = document.getElementById("bgColor");
+    const bgColorPicker = document.getElementById("bgColorPicker");
+    const bgOpacity = document.getElementById("bgOpacity");
+    const bgGradient = document.getElementById("bgGradient");
+    const bgHideEmpty = document.getElementById("bgHideEmpty");
+
+    const fgText = document.getElementById("fgText");
+    const fgColor = document.getElementById("fgColor");
+    const fgColorPicker = document.getElementById("fgColorPicker");
+    const fgFontSize = document.getElementById("fgFontSize");
+    const fgWeight = document.getElementById("fgWeight");
+    const fgFontFamily = document.getElementById("fgFontFamily");
+    const fgAlign = document.getElementById("fgAlign");
+    const fgOpacity = document.getElementById("fgOpacity");
+    const fgX = document.getElementById("fgX");
+    const fgY = document.getElementById("fgY");
+    const fgMaxChars = document.getElementById("fgMaxChars");
+
+    const logoType = document.getElementById("logoType");
+    const logoX = document.getElementById("logoX");
+    const logoY = document.getElementById("logoY");
+    const logoW = document.getElementById("logoW");
+    const logoH = document.getElementById("logoH");
+
+    function refreshInspector() {
+      primaryColor.value = state.primaryColor || "#000000";
+      fgFontFamily.value = state.fontFamily || "Oswald";
+
+      const g = selectedId ? findById(selectedId) : null;
+      if (!g) {
+        selSummary.textContent = "No selection";
+        setDisabled(true);
+        return;
+      }
+      setDisabled(false);
+      selSummary.textContent = g.type;
+
+      boxX.value = Number(g.x ?? 0);
+      boxY.value = Number(g.y ?? 0);
+      boxW.value = Number(g.width ?? 0);
+      boxH.value = Number(g.height ?? 0);
+      boxZ.value = Number(g.z ?? 0);
+      boxType.value = g.type ?? "";
+
+      const b = g.background || {};
+      bgColor.value = b.color ?? "";
+      bgColorPicker.value = colorToHex(b.color, "#000000");
+      bgOpacity.value = safeOpacity(b.opacity ?? 1);
+      bgGradient.value = String(!!b.gradient);
+      bgHideEmpty.value = isNil(b.hideEmpty) ? "(unset)" : String(!!b.hideEmpty);
+
+      const f = g.foreground || {};
+      fgText.value = isNil(f.text) ? "" : String(f.text);
+      fgColor.value = f.color ?? "";
+      fgColorPicker.value = colorToHex(f.color, "#ffffff");
+      fgFontSize.value = Number(f.fontSize ?? 16);
+      fgWeight.value = f.weight ?? "normal";
+      fgAlign.value = (f.textAlign ?? "LEFT");
+      fgOpacity.value = safeOpacity(f.opacity ?? 1);
+
+      fgX.value = Number(!isNil(f.x) ? f.x : (Number(g.x ?? 0) + Number(g.width ?? 0) / 2));
+      fgY.value = Number(!isNil(f.y) ? f.y : (Number(g.y ?? 0) + Number(g.height ?? 0) / 2));
+      fgMaxChars.value = Number(f.maxChars ?? 0);
+
+      const l = f.logo;
+      if (l) {
+        logoType.value = l.logoType ?? "";
+        logoX.value = Number(l.x ?? 0);
+        logoY.value = Number(l.y ?? 0);
+        logoW.value = Number(l.width ?? 0);
+        logoH.value = Number(l.height ?? 0);
+        setLogoDisabled(false);
+      } else {
+        logoType.value = "";
+        logoX.value = "";
+        logoY.value = "";
+        logoW.value = "";
+        logoH.value = "";
+        setLogoDisabled(true);
+      }
+    }
+
+    function refreshInspectorBoxOnly() {
+      const g = selectedId ? findById(selectedId) : null;
+      if (!g) return;
+      boxX.value = Number(g.x ?? 0);
+      boxY.value = Number(g.y ?? 0);
+      boxW.value = Number(g.width ?? 0);
+      boxH.value = Number(g.height ?? 0);
+    }
+
+    function setDisabled(disabled) {
+      [
+        boxX, boxY, boxW, boxH, boxZ,
+        bgColor, bgColorPicker, bgOpacity, bgGradient, bgHideEmpty,
+        fgText, fgColor, fgColorPicker, fgFontSize, fgWeight, fgAlign, fgOpacity, fgX, fgY, fgMaxChars
+      ].forEach(el => el.disabled = disabled);
+      fgFontFamily.disabled = false;
+      setLogoDisabled(true);
+    }
+
+    function setLogoDisabled(disabled) {
+      [logoX, logoY, logoW, logoH].forEach(el => el.disabled = disabled);
+    }
+
+    function updateSelected(mutator) {
+      const g = selectedId ? findById(selectedId) : null;
+      if (!g) return;
+      pushUndoSnapshot();
+      mutator(g);
+      render();
+    }
+
+    primaryColor.addEventListener("input", () => {
+      pushUndoSnapshot();
+      state.primaryColor = primaryColor.value;
+      render();
+    });
+
+    [boxX, boxY, boxW, boxH, boxZ].forEach(inp => {
+      inp.addEventListener("input", () => {
+        updateSelected((g) => {
+          g.x = Math.round(Number(boxX.value));
+          g.y = Math.round(Number(boxY.value));
+          g.width = Math.max(1, Math.round(Number(boxW.value)));
+          g.height = Math.max(1, Math.round(Number(boxH.value)));
+          g.z = Math.round(Number(boxZ.value));
+        });
+      });
+    });
+
+    [bgColor, bgOpacity, bgGradient, bgHideEmpty].forEach(inp => {
+      inp.addEventListener("input", () => {
+        updateSelected((g) => {
+          g.background = g.background || {};
+          g.background.color = bgColor.value || g.background.color;
+          g.background.opacity = safeOpacity(bgOpacity.value);
+          g.background.gradient = asBool(bgGradient.value);
+          if (bgHideEmpty.value === "(unset)") delete g.background.hideEmpty;
+          else g.background.hideEmpty = asBool(bgHideEmpty.value);
+        });
+      });
+    });
+    bgColorPicker.addEventListener("input", () => {
+      bgColor.value = bgColorPicker.value;
+      bgColor.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    [fgText, fgColor, fgFontSize, fgWeight, fgAlign, fgOpacity, fgX, fgY, fgMaxChars].forEach(inp => {
+      inp.addEventListener("input", () => {
+        updateSelected((g) => {
+          g.foreground = g.foreground || {};
+          g.foreground.text = fgText.value;
+          g.foreground.color = fgColor.value || g.foreground.color;
+          g.foreground.fontSize = Number(fgFontSize.value);
+          g.foreground.weight = fgWeight.value;
+          g.foreground.textAlign = fgAlign.value;
+          g.foreground.opacity = safeOpacity(fgOpacity.value);
+
+          g.foreground.x = Number(fgX.value);
+          g.foreground.y = Number(fgY.value);
+
+          g.foreground.maxChars = Math.round(Number(fgMaxChars.value));
+        });
+      });
+    });
+    fgColorPicker.addEventListener("input", () => {
+      fgColor.value = fgColorPicker.value;
+      fgColor.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    fgFontFamily.addEventListener("input", () => {
+      pushUndoSnapshot();
+      state.fontFamily = fgFontFamily.value || "Oswald";
+      applyGlobalFontToAll();
+      render();
+    });
+
+    [logoX, logoY, logoW, logoH].forEach(inp => {
+      inp.addEventListener("input", () => {
+        updateSelected((g) => {
+          if (!g.foreground?.logo) return;
+          g.foreground.logo.x = Math.round(Number(logoX.value));
+          g.foreground.logo.y = Math.round(Number(logoY.value));
+          g.foreground.logo.width = Math.max(1, Math.round(Number(logoW.value)));
+          g.foreground.logo.height = Math.max(1, Math.round(Number(logoH.value)));
+        });
+      });
+    });
+
+    // ===== Toolbar =====
+    document.getElementById("btnToggleGrid").addEventListener("click", () => {
+      grid.style.display = (grid.style.display === "none" ? "block" : "none");
+    });
+
+    document.getElementById("btnDelete").addEventListener("click", () => {
+      if (!selectedId) return;
+      pushUndoSnapshot();
+      state.graphics = state.graphics.filter(g => g.__id !== selectedId);
+      selectedId = null;
+      render();
+    });
+
+    document.getElementById("btnExport").addEventListener("click", () => {
+      jsonArea.value = JSON.stringify(exportJson(), null, 2);
+      alert("Exported JSON is now in the JSON textarea.");
+    });
+
+    document.getElementById("btnCopy").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(JSON.stringify(exportJson(), null, 2));
+        alert("Copied exported JSON to clipboard.");
+      } catch {
+        alert("Copy failed (clipboard permission). You can manually copy from the JSON textarea.");
+      }
+    });
+
+    document.getElementById("btnImport").addEventListener("click", () => {
+      try {
+        const obj = JSON.parse(jsonArea.value);
+        if (!obj || !Array.isArray(obj.graphics)) throw new Error("Invalid format: expected { graphics: [...] }");
+        pushUndoSnapshot();
+        state = structuredClone(obj);
+        ensureGlobalFontFamily();
+        selectedId = null;
+        render();
+        alert("Imported JSON from textarea.");
+      } catch (e) {
+        alert("Import failed: " + (e?.message || String(e)));
+      }
+    });
+
+    // ===== Keyboard nudge (box only) =====
+    window.addEventListener("keydown", (e) => {
+      updateModeBadge(!!e.ctrlKey);
+      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "z") {
+        if (isEditableTarget(e.target)) return;
+        e.preventDefault();
+        undoLastChange();
+        return;
+      }
+      if (isEditableTarget(e.target)) return;
+      if (!selectedId) return;
+      if (!["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) return;
+      e.preventDefault();
+      const step = e.shiftKey ? 10 : 1;
+
+      const g = findById(selectedId);
+      if (!g) return;
+      pushUndoSnapshot();
+
+      if (e.key === "ArrowUp") g.y = Math.round((g.y ?? 0) - step);
+      if (e.key === "ArrowDown") g.y = Math.round((g.y ?? 0) + step);
+      if (e.key === "ArrowLeft") g.x = Math.round((g.x ?? 0) - step);
+      if (e.key === "ArrowRight") g.x = Math.round((g.x ?? 0) + step);
+
+      render();
+    });
+
+    window.addEventListener("keyup", (e) => {
+      if (e.key === "Control") updateModeBadge(false);
+    });
+    window.addEventListener("blur", () => updateModeBadge(false));
+
+    // ===== Boot =====
+    jsonArea.value = JSON.stringify(exportJson(), null, 2);
+    updateModeBadge(false);
+    render();
+
+    // Run:
+    // 1) Save as editor.html
+    // 2) python3 -m http.server 8000
+    // 3) http://localhost:8000/editor.html
+  </script>
+</body>
+</html>
+
