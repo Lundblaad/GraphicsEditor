@@ -1,14 +1,14 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Graphics Layout Editor (Localhost)</title>
 
-  <!-- Google Font: Oswald -->
+  <!-- Google Font: Google Sans Flex -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@8..144,300..700&display=swap" rel="stylesheet">
 
   <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
 
@@ -355,9 +355,10 @@
                 <option value="system-ui">System UI</option>
                 <option value="Arial">Arial</option>
                 <option value="Oswald">Oswald</option>
+                <option value="Google Sans Flex">Google Sans Flex</option>
               </select>
             </label>
-            <label style="opacity:0.85">(Oswald loaded)</label>
+            <label style="opacity:0.85">(Google Sans Flex loaded)</label>
           </div>
 
           <div class="row">
@@ -457,7 +458,7 @@
 
     function ensureGlobalFontFamily() {
       if (!state.fontFamily) {
-        state.fontFamily = getFirstFontFamily(state.graphics) || "Oswald";
+        state.fontFamily = getFirstFontFamily(state.graphics) || "Google Sans Flex";
       }
       return state.fontFamily;
     }
@@ -657,7 +658,7 @@
         textEl.setAttribute("fill-opacity", String(safeOpacity(f.opacity)));
         textEl.setAttribute("font-size", String(Number(f.fontSize ?? 16)));
         textEl.setAttribute("font-weight", String(f.weight ?? "normal"));
-        textEl.setAttribute("font-family", String(globalFont || "Oswald"));
+        textEl.setAttribute("font-family", String(globalFont || "Google Sans Flex"));
 
         svg.appendChild(textEl);
         fgHandle.appendChild(svg);
@@ -1015,7 +1016,7 @@
 
     function refreshInspector() {
       primaryColor.value = state.primaryColor || "#000000";
-      fgFontFamily.value = state.fontFamily || "Oswald";
+      fgFontFamily.value = state.fontFamily || "Google Sans Flex";
 
       const g = selectedId ? findById(selectedId) : null;
       if (!g) {
@@ -1162,7 +1163,7 @@
 
     fgFontFamily.addEventListener("input", () => {
       pushUndoSnapshot();
-      state.fontFamily = fgFontFamily.value || "Oswald";
+      state.fontFamily = fgFontFamily.value || "Google Sans Flex";
       applyGlobalFontToAll();
       render();
     });
@@ -1265,4 +1266,5 @@
   </script>
 </body>
 </html>
+
 
